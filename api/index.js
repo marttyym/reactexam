@@ -8,6 +8,7 @@ const postRoute = require("./routes/posts")
 const categoryRoute = require("./routes/categories")
 const multer = require("multer");
 const path = require("path");
+const crypto = require("crypto");
 
 dotenv.config();
 app.use(express.json())
@@ -25,13 +26,24 @@ const storage = multer.diskStorage({
     destination:(req,file,cb) => {
         cb(null, "images")
     },filename:(req, file, cb) => {
-        cb(null,req.body.name)
+        // Generate a secure random filename to prevent path traversal attacks
+        // Extract the file extension from the original uploaded file
+        const originalName = path.basename(file.originalname);
+        const ext = path.extname(originalName);
+        // Generate cryptographically secure random filename
+        const randomName = crypto.randomBytes(16).toString('hex');
+        const safeFilename = randomName + ext;
+        cb(null, safeFilename)
     }
 })
 
 const upload = multer({storage:storage})
 app.post("/api/upload", upload.single("file"),(req,res)=>{
-    res.status(200).json("File has been uploaded")
+    // Return the server-generated filename to the client
+    res.status(200).json({
+        message: "File has been uploaded",
+        filename: req.file.filename
+    })
 })
 
 app.use("/api/auth", authRoute)

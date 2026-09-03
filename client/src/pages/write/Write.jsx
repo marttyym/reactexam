@@ -17,13 +17,15 @@ export default function Write() {
     };
     if (file) {
       const data = new FormData();
-      const filename = Date.now() + file.name;
-      data.append("name", filename);
       data.append("file", file);
-      newPost.photo = filename;
       try {
-        await axios.post("/upload", data);
-      } catch (err) {}
+        const uploadRes = await axios.post("/upload", data);
+        // Use the server-generated filename from the response
+        newPost.photo = uploadRes.data.filename;
+      } catch (err) {
+        console.error("Upload failed:", err);
+        return;
+      }
     }
     try {
       const res = await axios.post("/posts", newPost);
