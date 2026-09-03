@@ -25,13 +25,16 @@ export default function Settings() {
     };
     if (file) {
       const data = new FormData();
-      const filename = Date.now() + file.name;
-      data.append("name", filename);
       data.append("file", file);
-      updatedUser.profilePic = filename;
       try {
-        await axios.post("/upload", data);
-      } catch (err) {}
+        const uploadRes = await axios.post("/upload", data);
+        // Use the server-generated filename from the response
+        updatedUser.profilePic = uploadRes.data.filename;
+      } catch (err) {
+        console.error("Upload failed:", err);
+        dispatch({ type: "UPDATE_FAILURE" });
+        return;
+      }
     }
     try {
       const res = await axios.put("/users/" + user._id, updatedUser);
