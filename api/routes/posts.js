@@ -1,10 +1,17 @@
 const router = require("express").Router();
 const User = require("../models/User");
 const Post = require("../models/Post");
+const verifyToken = require("../middleware/auth");
 
 //Create
-router.post("/", async (req, res) => {
-  const newPost = new Post(req.body);
+router.post("/", verifyToken, async (req, res) => {
+  // Use authenticated username from JWT token
+  const postData = {
+    ...req.body,
+    username: req.user.username // Override with authenticated username
+  };
+  
+  const newPost = new Post(postData);
   try {
     const savedPost = await newPost.save();
     res.status(200).json(savedPost);
@@ -14,26 +21,36 @@ router.post("/", async (req, res) => {
 });
 
 //Update
-router.put("/:id", async (req, res) => {
+router.put("/:id", verifyToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-    if (post.username === req.body.username) {
-      try {
-        const updatedPost = await Post.findOneAndUpdate(
-          { _id: { $eq: req.params.id } },
-          {
-            $set: req.body,
-          },
-          {
-            new: true,
-          }
-        );
-        res.status(200).json(updatedPost);
-      } catch (err) {
-        res.status(500).json(err);
-      }
-    } else {
-      res.status(401).json("You can update only your post");
+    
+    if (!post) {
+      return res.status(404).json("Post not found");
+    }
+    
+    // Verify the authenticated user owns this post
+    if (post.username !== req.user.username) {
+      return res.status(403).json("You can update only your post");
+    }
+    
+    try {
+      // Prevent username from being modified via request body
+      const updateData = { ...req.body };
+      delete updateData.username;
+      
+      const updatedPost = await Post.findOneAndUpdate(
+        { _id: { $eq: req.params.id } },
+        {
+          $set: updateData,
+        },
+        {
+          new: true,
+        }
+      );
+      res.status(200).json(updatedPost);
+    } catch (err) {
+      res.status(500).json(err);
     }
   } catch (err) {
     res.status(500).json(err);
@@ -41,18 +58,24 @@ router.put("/:id", async (req, res) => {
 });
 
 //delete
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-    if (post.username === req.body.username) {
-      try {
-        await post.deleteOne();
-        res.status(200).json("Post has been deleted");
-      } catch (err) {
-        res.status(500).json(err);
-      }
-    } else {
-      res.status(401).json("You can delete only your post");
+    
+    if (!post) {
+      return res.status(404).json("Post not found");
+    }
+    
+    // Verify the authenticated user owns this post
+    if (post.username !== req.user.username) {
+      return res.status(403).json("You can delete only your post");
+    }
+    
+    try {
+      await post.deleteOne();
+      res.status(200).json("Post has been deleted");
+    } catch (err) {
+      res.status(500).json(err);
     }
   } catch (err) {
     res.status(500).json(err);
