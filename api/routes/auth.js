@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const User = require("../models/User")
 const bcrypt = require("bcrypt")
+const { generateToken } = require("../middleware/auth")
 
 //Register
 router.post("/register", async (req, res)=>{
@@ -15,7 +16,9 @@ router.post("/register", async (req, res)=>{
         })
 
         const user = await newUser.save();
-        res.status(200).json(user)
+        const {password, ...others} = user._doc
+        const token = generateToken(user._id.toString())
+        res.status(200).json({...others, token})
     }catch(err){
         res.status(500).json(err)
     }
@@ -25,13 +28,18 @@ router.post("/register", async (req, res)=>{
 router.post("/login", async (req, res)=>{
     try{
         const user = await User.findOne({username: req.body.username})
-        !user && res.status(400).json("Wrong credentials")
+        if (!user) {
+            return res.status(400).json("Wrong credentials")
+        }
 
         const validated = await bcrypt.compare(req.body.password, user.password)
-        !validated && res.status(400).json("Wrong credentials")
+        if (!validated) {
+            return res.status(400).json("Wrong credentials")
+        }
         
         const {password, ...others} = user._doc
-        res.status(200).json(others)
+        const token = generateToken(user._id.toString())
+        res.status(200).json({...others, token})
     }catch(err){
         res.status(500).json(err)
     }
